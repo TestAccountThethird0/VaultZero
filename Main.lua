@@ -216,9 +216,10 @@ CommandArgTypes = {
 }
 
 ---==//Settings\\==---
-MenuKeybind = Enum.KeyCode.Backquote
+MenuKeybind = Enum.KeyCode.Semicolon
 ---==//Globals\\==---
 local uis = game:GetService("UserInputService")
+local runservice = game:GetService("RunService")
 local ContextActionService = game:GetService("ContextActionService")
 Players = game:GetService("Players")
 local TeleportService = game:GetService("TeleportService")
@@ -229,7 +230,15 @@ local CMDDictionary = {}
 local CommandsVariables = {}
 ---==//Code\\==---
 local CommandsRuntime = {}
-game.StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack,false)
+--game.StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack,false)
+
+function CurrentTime()
+    local now = os.time()
+    date = os.date("*t",now)
+    local dateString = "{year}-{month}-{day} {hour}:{min}"
+    local result = string.gsub(dateString, "{(%w+)}", date)
+    return result
+end
 
 function GetCommand(Text)
     for _,Command in CMDDictionary do
@@ -407,13 +416,14 @@ addCMD({
         if not plr.Character then return end
         if not plr.Character:FindFirstChild("HumanoidRootPart") then return end
         if not plr.Character.PrimaryPart then return end
+        plr.Backpack:ClearAllChildren()
         local cf = plr.Character.PrimaryPart.CFrame
         local archivable = plr.Character.Archivable
         plr.Character.Archivable = true
         local clone = plr.Character:Clone()
         plr.Character:PivotTo(CFrame.new(0,31000000,0)) -- 31M in the air
         game:GetService("Workspace").CurrentCamera.CameraSubject = clone
-        task.wait(0.15)
+        task.wait(0.05)
         plr.Character.Archivable = archivable
         plr.Character.PrimaryPart.Anchored = true
         local oldChar = plr.Character
@@ -427,6 +437,7 @@ addCMD({
         end
         clone.Parent = workspace
         clone.Name = "CLONE"
+        plr.Backpack:ClearAllChildren()
     end
 })
 addCMD({
@@ -434,11 +445,12 @@ addCMD({
     Name = "visible",
     Alternatives = {"vis","appear","reveal","show"},
     Args = {},
-    Id = "invisible",
+    Id = "visible",
     Function = function(Args)
         local char = CommandsRuntime.Invisible.char
         local fake = CommandsRuntime.Invisible.fake
         local cf = CommandsRuntime.Invisible.CFrame
+        plr.Backpack:ClearAllChildren()
         plr.Character = CommandsRuntime.Invisible.char
         char.PrimaryPart.Anchored = false
         char:PivotTo(fake.PrimaryPart.CFrame)
@@ -455,7 +467,8 @@ addCMD({
     Id = "print",
     Function = function(Args)
         print(Args[1])
-        ShowLine("[LOG] >  "..Args[1])
+        local Current = "["..CurrentTime().."]"
+        ShowLine(Current.." [LOG] >  "..Args[1])
     end
 })
 
@@ -515,7 +528,7 @@ addCMD({
     Alternatives = {"iy","infyield"},
     Args = {"STRING"},
     Id = "infiniteyield",
-    Function = function(Args)
+    Function = function()
         loadstring(game:HttpGet('https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source'))()
     end
 })
@@ -526,7 +539,69 @@ addCMD({
     Alternatives = {"iyr","infyieldreborn","iyreborn"},
     Args = {"STRING"},
     Id = "infiniteyieldreborn",
-    Function = function(Args)
+    Function = function()
         loadstring(game:HttpGet(('https://raw.githubusercontent.com/RyXeleron/infiniteyield-reborn/refs/heads/master/source' or 'https://ryxeleron.github.io/storage/iyrbackup/legacy/master/source')))()
+    end
+})
+
+addCMD({
+    ToggleCommand = true,
+    Name = "noclip",
+    Alternatives = {"nclip"},
+    Args = {},
+    Id = "noclip",
+    Function = function()
+        local connection = runservice.PreSimulation:Connect(function()
+            if plr.Character then
+                for _, child in plr.Character:GetDescendants() do
+			        if child:IsA("BasePart") and child.CanCollide == true then
+				        child.CanCollide = false
+			        end
+                end
+	        end
+            end)
+        CommandsRuntime.invisible = connection
+    end
+})
+
+addCMD({
+    ToggleCommand = true,
+    Name = "clip",
+    Alternatives = {},
+    Args = {},
+    Id = "clip",
+    Function = function()
+        if CommandsRuntime.invisible then
+            CommandsRuntime.invisible:Disconnect()
+            CommandsRuntime.invisible = nil
+        end
+    end
+})
+
+addCMD({
+    ToggleCommand = nil,
+    Name = "walkspeed",
+    Alternatives = {"ws","speed"},
+    Args = {"NUMBER"},
+    Id = "walkspeed",
+    Function = function(Args)
+        if not plr.Character then return end
+        if not plr.Character:FindFirstChildWhichIsA("Humanoid") then return end
+        if not Args[1] then return end
+        plr.Character:FindFirstChildWhichIsA("Humanoid").WalkSpeed = Args[1]
+    end
+})
+
+addCMD({
+    ToggleCommand = nil,
+    Name = "jumpower",
+    Alternatives = {"jumpower","jumpstrength","jp"},
+    Args = {"NUMBER"},
+    Id = "jumppower",
+    Function = function(Args)
+        if not plr.Character then return end
+        if not plr.Character:FindFirstChildWhichIsA("Humanoid") then return end
+        if not Args[1] then return end
+        plr.Character:FindFirstChildWhichIsA("Humanoid").JumpPower = Args[1]
     end
 })
