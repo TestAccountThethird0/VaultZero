@@ -473,7 +473,7 @@ addCMD({
 addCMD({
     ToggleCommand = nil,
     Name = "rejoin",
-    Alternatives = {},
+    Alternatives = {"rj"},
     Args = {},
     Id = "rejoin",
     Function = function(Args)
@@ -484,5 +484,49 @@ addCMD({
 	    else
 		    TeleportService:TeleportToPlaceInstance(PlaceId, JobId, plr)
     	end
+    end
+})
+
+addCMD({
+    ToggleCommand = nil,
+    Name = "dex",
+    Alternatives = {"explorer"},
+    Args = {"STRING"},
+    Id = "dex",
+    Function = function(Args)
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/infyiff/backup/main/dex.lua"))()
+    end
+})
+
+addCMD({
+    ToggleCommand = nil,
+    Name = "remotespy",
+    Alternatives = {"rspy"},
+    Args = {"STRING"},
+    Id = "remotespy",
+    Function = function(Args)
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/infyiff/backup/main/SimpleSpyV3/main.lua"))()
+    end
+})
+
+addCMD({
+    ToggleCommand = nil,
+    Name = "infiniteyield",
+    Alternatives = {"iy","infyield"},
+    Args = {"STRING"},
+    Id = "infiniteyield",
+    Function = function(Args)
+        loadstring(game:HttpGet('https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source'))()
+    end
+})
+
+addCMD({
+    ToggleCommand = nil,
+    Name = "infiniteyieldreborn",
+    Alternatives = {"iyr","infyieldreborn","iyreborn"},
+    Args = {"STRING"},
+    Id = "infiniteyieldreborn",
+    Function = function(Args)
+        loadstring(game:HttpGet(('https://raw.githubusercontent.com/RyXeleron/infiniteyield-reborn/refs/heads/master/source' or 'https://ryxeleron.github.io/storage/iyrbackup/legacy/master/source')))()
     end
 })
