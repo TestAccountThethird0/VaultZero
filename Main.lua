@@ -1,5 +1,12 @@
 --T6stKidd's Vault Zero
 
+-- 0.96 STATUS: Released
+--//Changes\\--
+--Offset & Tppos Commands now Save Orientation when teleporting
+--//New\\--
+--Loadstring Command
+--oldconsole Command
+
 if VaultZeroLoaded and VaultZeroLoaded == true then
     warn("Vault Zero is already running.")
     return
@@ -727,7 +734,16 @@ addCMD({
     Id = "tppos",
     Function = function(Args)
         if not plr.Character then return end
-        plr.Character:PivotTo(CFrame.new(Vector3.new(Args[1],Args[2],Args[3])))
+        local Ori = plr.Character.PrimaryPart.Orientation
+        local CF = CFrame.new(
+            Args[1],
+            Args[2],
+            Args[3])*
+        CFrame.Angles(
+            math.rad(Ori.X),
+            math.rad(Ori.Y),
+            math.rad(Ori.Z))
+        plr.Character:PivotTo(CF)
     end
 })
 
@@ -740,7 +756,8 @@ addCMD({
     Function = function(Args)
         if not plr.Character then return end
         local Vec = plr.Character.PrimaryPart.Position
-        plr.Character:PivotTo(CFrame.new(Vec+Vector3.new(Args[1],Args[2],Args[3])))
+        local Ori = plr.Character.PrimaryPart.Orientation
+        plr.Character:PivotTo(CFrame.new(Vec+Vector3.new(Args[1],Args[2],Args[3]))*CFrame.Angles(math.rad(Ori.X),math.rad(Ori.Y),math.rad(Ori.Z)))
     end
 })
 
@@ -894,5 +911,26 @@ addCMD({
         NewFileName = NewFileName..".txt"
         writefile(NewFileName,VaultZeroLogs)
         ShowLine("Saved VaultZeroLogs to '"..NewFileName.."'")
+    end
+})
+
+addCMD({
+    ToggleCommand = nil,
+    Name = "loadstring",
+    Alternatives = {"runcode","execute"},
+    Args = {"STRING"},
+    Id = "loadstring",
+    Function = function(Args)
+       loadstring(Args[1]) 
+    end
+})
+
+addCMD({
+    ToggleCommand = nil,
+    Name = "oldconsole",
+    Alternatives = {"ogconsole"},
+    Args = {},
+    Function = function(Args)
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/infyiff/backup/main/console.lua",true))()
     end
 })
