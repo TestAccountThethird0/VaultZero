@@ -21,6 +21,7 @@ local Console_UICorner = Instance.new("UICorner")
 local Console_UIStroke = Instance.new("UIStroke")
 local Console_ScrollingFrame = Instance.new("ScrollingFrame")
 local Console_ScrollingFrame_Template = Instance.new("TextLabel")
+local Console_ScrollingFrame_Template_UISizeConstraint = Instance.new("UISizeConstraint")
 local Console_ScrollingFrame_UIListLayout = Instance.new("UIListLayout")
 
 --//Type Properties\\
@@ -107,7 +108,7 @@ Console_ScrollingFrame.Size = UDim2.new(0.974, 0,0.934, 0)
 Console_ScrollingFrame.CanvasSize = UDim2.new(0,0,2,0)
 Console_ScrollingFrame.Parent = Console
 --
-Console_ScrollingFrame_UIListLayout.Padding = UDim.new(0.01,0)
+Console_ScrollingFrame_UIListLayout.Padding = UDim.new(0,1)
 Console_ScrollingFrame_UIListLayout.FillDirection = Enum.FillDirection.Vertical
 Console_ScrollingFrame_UIListLayout.Parent = Console_ScrollingFrame
 --
@@ -123,15 +124,14 @@ Console_ScrollingFrame_Template.Font = Enum.Font.RobotoMono
 Console_ScrollingFrame_Template.TextWrapped = true
 Console_ScrollingFrame_Template.Visible = false
 Console_ScrollingFrame_Template.Parent = Console_ScrollingFrame
---
-VaultZero.Parent = game.CoreGui
 
-function ShowLine(Text)
-    local Line = Console_ScrollingFrame_Template:Clone()
-    Line.Text = Text
-    Line.Parent = Console_ScrollingFrame
-    Line.Visible = true
-end
+Console_ScrollingFrame_Template_UISizeConstraint.MinSize = Vector2.new(0,15)
+Console_ScrollingFrame_Template_UISizeConstraint.MaxSize = Vector2.new(math.huge,15)
+Console_ScrollingFrame_Template_UISizeConstraint.Parent = Console_ScrollingFrame_Template
+
+--
+
+VaultZero.Parent = game.CoreGui
 
 -- Type_TextBox.Changed:Connect(function()
 -- 	Type_TextBox.Text = "> "..Type_TextBox.Text:sub(3,#Type_TextBox.Text)
@@ -217,7 +217,11 @@ CommandArgTypes = {
 
 ---==//Settings\\==---
 MenuKeybind = Enum.KeyCode.Semicolon
+CommandPrefix = {";",":","~","!"}
 ---==//Globals\\==---
+local TeleportService = game:GetService("TeleportService")
+local ChatService = game:GetService("TextChatService")
+local HttpService = game:GetService("HttpService")
 local uis = game:GetService("UserInputService")
 local runservice = game:GetService("RunService")
 local ContextActionService = game:GetService("ContextActionService")
@@ -228,16 +232,55 @@ local plr = Players.LocalPlayer
 local CMDIDs = {}
 local CMDDictionary = {}
 local CommandsVariables = {}
+local VaultZeroLogs = ""
 ---==//Code\\==---
+local TextLines = 0
+local LastMsg = nil
 local CommandsRuntime = {}
---game.StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack,false)
 
 function CurrentTime()
     local now = os.time()
-    date = os.date("*t",now)
-    local dateString = "{year}-{month}-{day} {hour}:{min}"
-    local result = string.gsub(dateString, "{(%w+)}", date)
-    return result
+    local date = os.date("*t", now)
+    local dateString = string.format("%04d-%02d-%02d %02d:%02d:%02d", 
+                                     date.year, date.month, date.day, 
+                                     date.hour, date.min, date.sec)
+    return dateString
+end
+
+function ShowLine(Text,NoTime)
+    local ScrollDown = false
+    local CanvasPos = Console_ScrollingFrame.CanvasPosition.Y
+    local CanvasSize = Console_ScrollingFrame.CanvasSize.Y.Scale
+    local ScrollAbsoluteSize = Console_ScrollingFrame.AbsoluteSize.Y
+    local RangeMin = CanvasPos
+    local RangeMax = CanvasPos+ScrollAbsoluteSize
+    local Difference = (Console_ScrollingFrame.AbsoluteCanvasSize.Y-ScrollAbsoluteSize)-CanvasPos
+    if Difference <= 2 then
+        ScrollDown = true
+    end
+    if NoTime == nil then NoTime = false end
+    if NoTime == false then
+        local CTime = CurrentTime()
+        CTime = "["..CTime.."] "
+        Text = CTime..Text
+    end
+    local Line = Console_ScrollingFrame_Template:Clone()
+    Line.Text = Text
+    Line.Parent = Console_ScrollingFrame
+    Line.Visible = true
+    TextLines += 1
+    LastMsg = Line
+    VaultZeroLogs = VaultZeroLogs.."\n "..Text
+    local Total = 0
+    for _,obj in Console_ScrollingFrame:GetChildren() do
+        if obj:IsA("TextLabel") then
+            Total += 16
+        end
+    end
+    Console_ScrollingFrame.CanvasSize = UDim2.new(0,0,0,Total)
+    if ScrollDown == true then
+        Console_ScrollingFrame.CanvasPosition = Vector2.new(0,Console_ScrollingFrame.AbsoluteCanvasSize.Y)
+    end
 end
 
 function GetCommand(Text)
@@ -301,11 +344,6 @@ function ExecuteCommand(Text)
         return
     end
     local CommandName = Args[1]:lower()
-    if CommandName == "debug-destroy" then
-        game.CoreGui:FindFirstChild("VaultZero"):Destroy()
-        pcall(function() getgenv().VaultZeroLoaded = false end)
-        return
-    end
     local Command = GetCommand(CommandName)
     if not Command then return end
     local CommandId = CMDIDs[Command.Id]
@@ -366,14 +404,32 @@ function addCMD(Data)
     end
     RegisterCMDDictionary(Data)
 end
-
+CommandsRuntime.log = {}
 function handleAction(actionName, inputState, _inputObject)
 	if actionName == "VaultZeroFocus" and inputState == Enum.UserInputState.End then
 		Type_TextBox:CaptureFocus()
 	end
 end
-
 ContextActionService:BindAction("VaultZeroFocus", handleAction, false, MenuKeybind)
+if ChatService.ChatVersion == Enum.ChatVersion.TextChatService then
+    ChatService.MessageReceived:Connect(function(msg)
+        local Sender = Players:GetPlayerByUserId(msg.TextSource.UserId)
+        if CommandsRuntime.log.chat == true then
+            ShowLine("[CHAT] [@"..Sender.Name.."]: "..msg.Text)
+        end
+        if Sender == plr then
+            if table.find(CommandPrefix,msg.Text:sub(1,1)) then
+                ExecuteCommand(msg.Text:sub(2,#msg.Text))
+            end
+        end
+    end)
+end
+
+-- plr.Chatted:Connect(function(msg)
+--     --print("test")
+--     --print(msg:sub(1,1))
+-- end
+
 
 addCMD({
     ToggleCommand = nil,
@@ -400,10 +456,19 @@ addCMD({
     ToggleCommand = nil,
     Name = "debug",
     Alternatives = {"test"},
-    Args = {"PLAYER","NUMBER","STRING","BOOL"},
+    Args = {"STRING"}, -- what to debug
     Id = "debug",
     Function = function(Args)
-        
+        if Args[1] == "logs" then
+            print(VaultZeroLogs)
+        elseif Args[1] == "destroy" then
+            game.CoreGui:FindFirstChild("VaultZero"):Destroy()
+            pcall(function() getgenv().VaultZeroLoaded = false end)
+        elseif Args[1] == "logs2" then
+            for i=1,20 do
+                ShowLine("Line "..i)
+            end
+        end
     end
 })
 addCMD({
@@ -462,13 +527,35 @@ addCMD({
 addCMD({
     ToggleCommand = nil,
     Name = "print",
-    Alternatives = {"log"},
+    Alternatives = {},
     Args = {"STRING"},
     Id = "print",
     Function = function(Args)
         print(Args[1])
-        local Current = "["..CurrentTime().."]"
-        ShowLine(Current.." [LOG] >  "..Args[1])
+        ShowLine("[LOG] >  "..Args[1])
+    end
+})
+addCMD({
+    ToggleCommand = nil,
+    Name = "log",
+    Alternatives = {},
+    Args = {"STRING"},
+    Id = "log",
+    Function = function(Args)
+        CommandsRuntime.log[Args[1]] = true
+        ShowLine("[LOG] Started Logging '"..Args[1].."'")
+    end
+})
+
+addCMD({
+    ToggleCommand = nil,
+    Name = "unlog",
+    Alternatives = {"stoplog","dontlog"},
+    Args = {"STRING"},
+    Id = "unlog",
+    Function = function(Args)
+        CommandsRuntime.log[Args[1]] = false
+        ShowLine("[LOG] Stopped Logging '"..Args[1].."'")
     end
 })
 
@@ -603,5 +690,209 @@ addCMD({
         if not plr.Character:FindFirstChildWhichIsA("Humanoid") then return end
         if not Args[1] then return end
         plr.Character:FindFirstChildWhichIsA("Humanoid").JumpPower = Args[1]
+    end
+})
+
+addCMD({
+    ToggleCommand = nil,
+    Name = "serverhop",
+    Alternatives = {"shop"},
+    Args = {},
+    Id = "serverhop",
+    Function = function(Args)
+        local Servers = "https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"
+        local Server, Next = nil, nil
+        local function ListServers(cursor)
+            local Raw = game:HttpGet(Servers .. ((cursor and "&cursor=" .. cursor) or ""))
+            return HttpService:JSONDecode(Raw)
+        end
+
+        repeat
+            local Servers = ListServers(Next)
+            Server = Servers.data[math.random(1, (#Servers.data / 3))]
+            Next = Servers.nextPageCursor
+        until Server
+
+        if Server.playing < Server.maxPlayers and Server.id ~= game.JobId then
+            TeleportService:TeleportToPlaceInstance(game.PlaceId, Server.id, game.Players.LocalPlayer)
+        end
+    end
+})
+
+addCMD({
+    ToggleCommand = nil,
+    Name = "tppos",
+    Alternatives = {"tpos","tpcords","tpcoords"},
+    Args = {"NUMBER","NUMBER","NUMBER"},
+    Id = "tppos",
+    Function = function(Args)
+        if not plr.Character then return end
+        plr.Character:PivotTo(CFrame.new(Vector3.new(Args[1],Args[2],Args[3])))
+    end
+})
+
+addCMD({
+    ToggleCommand = nil,
+    Name = "offset",
+    Alternatives = {},
+    Args = {"NUMBER","NUMBER","NUMBER"},
+    Id = "offset",
+    Function = function(Args)
+        if not plr.Character then return end
+        local Vec = plr.Character.PrimaryPart.Position
+        plr.Character:PivotTo(CFrame.new(Vec+Vector3.new(Args[1],Args[2],Args[3])))
+    end
+})
+
+addCMD({
+    ToggleCommand = true,
+    Name = "marble",
+    Alternatives = {"ball","roll"},
+    Args = {"NUMBER"},
+    Id = "marble",
+    Function = function(Args)
+        local character = game.Players.LocalPlayer.Character
+        local torso = character:FindFirstChild("Torso") or character:FindFirstChild("UpperTorso")
+
+        if not torso then
+            return
+        end
+
+        local ball = character.HumanoidRootPart
+        originalSize = ball.Size
+        originalShape = ball.Shape
+
+        for i, v in ipairs(character:GetDescendants()) do
+            if v:IsA("BasePart") then
+                v.CanCollide = false
+            end
+        end
+    Camera = workspace.CurrentCamera
+    ball.Shape = Enum.PartType.Ball
+    local size = tonumber(Args[1]) or 5
+    ball.Size = Vector3.new(size, size, size)
+    local humanoid = character:WaitForChild("Humanoid")
+    local params = RaycastParams.new()
+    params.FilterType = Enum.RaycastFilterType.Blacklist
+    params.FilterDescendantsInstances = { character }
+    local SPEED_MULTIPLIER = 16
+    local JUMP_GAP = 0.4
+    local JUMP_POWER = 50
+    local JumpRequestConnection
+    local marbleConnection = runservice.RenderStepped:Connect(function(delta)
+            ball.CanCollide = true
+            SPEED_MULTIPLIER = humanoid.WalkSpeed
+            JUMP_POWER = humanoid.JumpPower
+            humanoid.PlatformStand = true
+            if uis:GetFocusedTextBox() then
+                return
+            end
+            if uis:IsKeyDown("W") then
+                ball.RotVelocity -= Camera.CFrame.RightVector * delta * SPEED_MULTIPLIER
+            end
+            if uis:IsKeyDown("A") then
+                ball.RotVelocity -= Camera.CFrame.LookVector * delta * SPEED_MULTIPLIER
+            end
+            if uis:IsKeyDown("S") then
+                ball.RotVelocity += Camera.CFrame.RightVector * delta * SPEED_MULTIPLIER
+            end
+            if uis:IsKeyDown("D") then
+                ball.RotVelocity += Camera.CFrame.LookVector * delta * SPEED_MULTIPLIER
+            end
+        end)
+
+        JumpRequest = uis.JumpRequest:Connect(function()
+            if marbleConnection.Connected == false then return end
+            local result =
+                workspace:Raycast(ball.Position, Vector3.new(0, -((ball.Size.Y / 2) + JUMP_GAP), 0), params)
+            if result then
+                ball.Velocity = ball.Velocity + Vector3.new(0, JUMP_POWER, 0)
+            end
+        end)
+        CommandsRuntime.Marble = {marble = marbleConnection,jump = JumpRequestConnection}
+        Camera.CameraSubject = torso
+
+        humanoid.Died:Connect(function()
+            if marbleConnection then
+            marbleConnection:Disconnect()
+            end
+        end)
+    end
+})
+
+addCMD({
+    ToggleCommand = false,
+    Name = "unmarble",
+    Alternatives = {"unball","unroll","noball","noroll"},
+    Args = {},
+    Id = "unmarble",
+    Function = function()
+        local character = plr.Character
+        local humanoid = character:WaitForChild("Humanoid")
+        local ball = character.HumanoidRootPart
+        local marbleConnectionTable = CommandsRuntime.Marble
+        local marbleConnection = CommandsRuntime.Marble.marble
+        local jumpConnection = CommandsRuntime.Marble.jump
+        if not marbleConnection then return end
+        if originalSize and originalShape then
+            ball.Size = originalSize
+            ball.Shape = originalShape
+        end
+        
+        humanoid.PlatformStand = false
+
+        if originalCameraSubject then
+            workspace.CurrentCamera.CameraSubject = originalCameraSubject
+        else
+            workspace.CurrentCamera.CameraSubject = humanoid
+        end
+
+        if marbleConnection then
+            marbleConnection:Disconnect()
+        end
+        if jumpConnection then
+            jumpConnection:Disconnect()
+        end
+        CommandsRuntime.Marble = nil
+    end
+})
+
+addCMD({
+    ToggleCommand = nil,
+    Name = "unc",
+    Alternatives = {},
+    Args = {},
+    Id = "unc",
+    Function = function()
+        loadstring(game:HttpGet('https://raw.githubusercontent.com/unified-naming-convention/NamingStandard/refs/heads/main/UNCCheckEnv.lua'))()
+    end
+})
+
+addCMD({
+    ToggleCommand = nil,
+    Name = "savelogs",
+    Alternatives = {},
+    Args = {},
+    Id = "savelogs",
+    Function = function()
+        local allowedCharacters = {
+        "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z", 
+        "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z", 
+        "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "-", "_"," "}
+        local CTime = CurrentTime()
+        CTime = string.gsub(CTime,":","-")
+        local GameId = game.PlaceId
+        local GameName = game:GetService("MarketplaceService"):GetProductInfo(GameId).Name
+        local FileName = CTime.." "..GameName
+        local FileNameSplit = FileName:split("")
+        local NewFileName = ""
+        for _,letter in FileNameSplit do
+            if table.find(allowedCharacters,letter) then
+                NewFileName = NewFileName..letter
+            end
+        end
+        NewFileName = NewFileName..".txt"
+        writefile(NewFileName,VaultZeroLogs)
+        ShowLine("Saved VaultZeroLogs to '"..NewFileName.."'")
     end
 })
