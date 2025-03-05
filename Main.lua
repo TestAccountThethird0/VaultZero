@@ -1,11 +1,20 @@
 --T6stKidd's Vault Zero
 
--- 0.96 STATUS: Released
+-- 0.95 STATUS: RELEASED
 --//Changes\\--
---Offset & Tppos Commands now Save Orientation when teleporting
+--Chat Commands now work properly work for legacy chat service
+--Chat logging now works properly for the legacy chat service
+--fixed Clip not working
+--fixed PLAYER Argument type not working if Text is only numbers
 --//New\\--
---Loadstring Command
---oldconsole Command
+--Spectate command (view)
+--Unspectate command (unview)
+--Glow command (light)
+--Unglow Command (unlight)
+--Follow Command
+--Unfollow Command
+--Walkto Command
+
 
 if VaultZeroLoaded and VaultZeroLoaded == true then
     warn("Vault Zero is already running.")
@@ -168,9 +177,7 @@ CommandArgTypes = {
         if typeof(Text) == "Instance" and Text:IsA("Player") then
             return Text
         end
-        if tonumber(Text) ~= nil then
-            return nil
-        end
+        Text = tostring(Text)..""
         if typeof(Text) == "string" then
             local names = {}
             for _,plr in Players:GetPlayers() do
@@ -189,7 +196,7 @@ CommandArgTypes = {
             for _,data in names do
                 local subName = data.name:sub(1,#Text)
                 local subDisplay = data.display:sub(1,#Text)
-                if Text:lower() == subName:lower() or Text:lower() == subDisplay:lower() then
+                if tostring(Text):lower() == tostring(subName):lower() or tostring(Text):lower() == subDisplay:lower() then
                     return data.obj
                 end
             end
@@ -292,7 +299,7 @@ end
 
 function GetCommand(Text)
     for _,Command in CMDDictionary do
-        if Command.Id == Text then
+        if Command.Name == Text then
             return Command
         elseif table.find(Command.Alternatives,Text) then
             return Command
@@ -418,11 +425,24 @@ function handleAction(actionName, inputState, _inputObject)
 	end
 end
 ContextActionService:BindAction("VaultZeroFocus", handleAction, false, MenuKeybind)
+local LegacyChatServicePlayerChatConnections = {}
+function legacyChatPlr(Pplr)
+    if LegacyChatServicePlayerChatConnections[Pplr] ~= nil then
+        return
+    end
+    local connection
+    connection = Pplr.Chatted:Connect(function(msg)
+        if CommandsRuntime.log.chat == true then
+            ShowLine("[PLR] [@"..Pplr.Name.."]: "..msg)
+        end
+    end)
+    LegacyChatServicePlayerChatConnections[Pplr] = connection
+end
 if ChatService.ChatVersion == Enum.ChatVersion.TextChatService then
     ChatService.MessageReceived:Connect(function(msg)
         local Sender = Players:GetPlayerByUserId(msg.TextSource.UserId)
         if CommandsRuntime.log.chat == true then
-            ShowLine("[CHAT] [@"..Sender.Name.."]: "..msg.Text)
+            ShowLine("[PLR] [@"..Sender.Name.."]: "..msg.Text)
         end
         if Sender == plr then
             if table.find(CommandPrefix,msg.Text:sub(1,1)) then
@@ -430,13 +450,51 @@ if ChatService.ChatVersion == Enum.ChatVersion.TextChatService then
             end
         end
     end)
+elseif ChatService.ChatVersion == Enum.ChatVersion.LegacyChatService then
+    for _,Pplr in Players:GetPlayers() do
+        if Pplr ~= plr then
+           legacyChatPlr(Pplr) 
+        end
+    end
+    game.Players.PlayerAdded:Connect(function(Pplr)
+        if Pplr == plr then
+            print("what")
+        end
+        if CommandsRuntime.log.join == true then
+            ShowLine("[PLR] Player @"..Pplr.Name.." ("..Pplr.UserId..") Joined")
+        end
+        legacyChatPlr(Pplr)
+    end)
+    Players.PlayerRemoving:Connect(function(Pplr)
+        if CommandsRuntime.log.join == true then
+            ShowLine("[PLR] Player @"..Pplr.Name.." ("..Pplr.UserId..") Left")
+        end
+        if LegacyChatServicePlayerChatConnections[Pplr] then
+            LegacyChatServicePlayerChatConnections[Pplr]:Disconnect()
+            LegacyChatServicePlayerChatConnections[Pplr] = nil
+        end
+    end)
+    local lastMsg = ""
+    plr.Chatted:Connect(function(msg)
+        if CommandsRuntime.log.chat == true and lastMsg ~= msg then
+            ShowLine("[PLR] [@"..plr.Name.."]: "..msg)
+        end
+        if table.find(CommandPrefix,msg:sub(1,1)) then
+            ExecuteCommand(msg:sub(2,#msg))
+        end
+        if Temp == 1 then
+            Temp = -1
+        end
+        lastMsg = msg
+    end)
 end
 
--- plr.Chatted:Connect(function(msg)
---     --print("test")
---     --print(msg:sub(1,1))
--- end
-
+function unloadVaultZero()
+    local connections = getconnections(plr.Chatted)
+    ContextActionService:UnbindAction("VaultZeroFocus")
+    pcall(function() getgenv().VaultZeroLoaded = false end)
+    game.CoreGui.VaultZero:Destroy()
+end
 
 addCMD({
     ToggleCommand = nil,
@@ -469,8 +527,7 @@ addCMD({
         if Args[1] == "logs" then
             print(VaultZeroLogs)
         elseif Args[1] == "destroy" then
-            game.CoreGui:FindFirstChild("VaultZero"):Destroy()
-            pcall(function() getgenv().VaultZeroLoaded = false end)
+            unloadVaultZero()
         elseif Args[1] == "logs2" then
             for i=1,20 do
                 ShowLine("Line "..i)
@@ -646,6 +703,7 @@ addCMD({
     Id = "noclip",
     Function = function()
         local connection = runservice.PreSimulation:Connect(function()
+            print("noclip")
             if plr.Character then
                 for _, child in plr.Character:GetDescendants() do
 			        if child:IsA("BasePart") and child.CanCollide == true then
@@ -659,15 +717,20 @@ addCMD({
 })
 
 addCMD({
-    ToggleCommand = true,
+    ToggleCommand = false,
     Name = "clip",
     Alternatives = {},
     Args = {},
-    Id = "clip",
+    Id = "noclip",
     Function = function()
         if CommandsRuntime.invisible then
             CommandsRuntime.invisible:Disconnect()
             CommandsRuntime.invisible = nil
+            if not plr.Character then return end
+            if not plr.Character:FindFirstChild("Head") then return end
+            if not plr.Character:FindFirstChild("Torso") then return end
+            plr.Character.Head.CanCollide = true
+            plr.Character.Torso.CanCollide = true
         end
     end
 })
@@ -716,7 +779,10 @@ addCMD({
 
         repeat
             local Servers = ListServers(Next)
-            Server = Servers.data[math.random(1, (#Servers.data / 3))]
+            if not Servers.data then return end
+            local max = math.round((#Servers.data / 3))
+            max = math.max(1,max)
+            Server = Servers.data[math.random(1, max)]
             Next = Servers.nextPageCursor
         until Server
 
@@ -848,6 +914,7 @@ addCMD({
         local humanoid = character:WaitForChild("Humanoid")
         local ball = character.HumanoidRootPart
         local marbleConnectionTable = CommandsRuntime.Marble
+        if not marbleConnection then return end
         local marbleConnection = CommandsRuntime.Marble.marble
         local jumpConnection = CommandsRuntime.Marble.jump
         if not marbleConnection then return end
@@ -932,5 +999,124 @@ addCMD({
     Args = {},
     Function = function(Args)
         loadstring(game:HttpGet("https://raw.githubusercontent.com/infyiff/backup/main/console.lua",true))()
+    end
+})
+
+addCMD({
+    ToggleCommand = true,
+    Name = "spectate",
+    Alternatives = {"view"},
+    Args = {"PLAYER"},
+    Id = "spectate",
+    Function = function(Args)
+        if not Args[1] then return end
+        workspace.CurrentCamera.CameraSubject = Args[1].Character.Humanoid
+    end
+})
+
+addCMD({
+    ToggleCommand = true,
+    Name = "unspectate",
+    Alternatives = {"unview"},
+    Args = {},
+    Id = "spectate",
+    Function = function(Args)
+        workspace.CurrentCamera.CameraSubject = plr.Character.Humanoid
+    end
+})
+
+addCMD({
+    ToggleCommand = true,
+    Name = "glow",
+    Alternatives = {"light"},
+    Args = {"NUMBER","NUMBER"},
+    Id = "glow",
+    Function = function(Args)
+        if not Args[1] then return end
+        if not Args[2] then return end
+        if not plr.Character then return end
+        if not plr.Character:FindFirstChild("HumanoidRootPart") then return end
+        if plr.Character:FindFirstChild("HumanoidRootPart"):FindFirstChild("VaultZeroGlow") then return end
+        local root = plr.Character:FindFirstChild("HumanoidRootPart")
+        local pointlight = Instance.new("PointLight")
+        pointlight.Name = "VaultZeroGlow"
+        pointlight.Range = Args[1]
+        pointlight.Brightness = Args[2]
+        pointlight.Parent = root
+    end
+})
+
+addCMD({
+    ToggleCommand = false,
+    Name = "unglow",
+    Alternatives = {"unlight"},
+    Args = {"NUMBER","NUMBER"},
+    Id = "glow",
+    Function = function(Args)
+        if not Args[1] then return end
+        if not Args[2] then return end
+        if not plr.Character then return end
+        if not plr.Character:FindFirstChild("HumanoidRootPart") then return end
+        if plr.Character:FindFirstChild("HumanoidRootPart"):FindFirstChild("VaultZeroGlow") then return end
+        local root = plr.Character:FindFirstChild("HumanoidRootPart")
+        local pointlight = Instance.new("PointLight")
+        pointlight.Name = "VaultZeroGlow"
+        pointlight.Range = Args[1]
+        pointlight.Brightness = Args[2]
+        pointlight.Parent = root
+    end
+})
+
+addCMD({
+    ToggleCommand = true,
+    Name = "follow",
+    Alternatives = {},
+    Args = {"PLAYER"},
+    Id = "follow",
+    Function = function(Args)
+        if not Args[1] then return end
+        local Connection = nil
+        Connection = runservice.Heartbeat:Connect(function()
+            local target = Args[1].Character
+            if not plr.Character then return end
+            if not plr.Character:FindFirstChildWhichIsA("Humanoid") then return end
+            if not target then return end
+            if not target:FindFirstChild("HumanoidRootPart") then return end
+            local hum = plr.Character:FindFirstChildWhichIsA("Humanoid")
+            hum:MoveTo(target.HumanoidRootPart.Position)
+        end)
+        CommandsRuntime.follow = Connection
+    end
+})
+
+addCMD({
+    ToggleCommand = false,
+    Name = "unfollow",
+    Alternatives = {},
+    Args = {},
+    Id = "follow",
+    Function = function(Args)
+        local Connection = CommandsRuntime.follow
+        if not Connection then return end
+        Connection:Disconnect()
+        CommandsRuntime.follow = nil
+    end
+})
+
+addCMD({
+    ToggleCommand = nil,
+    Name = "walkto",
+    Alternatives = {},
+    Args = {"PLAYER"},
+    Id = "walkto",
+    Function = function(Args)
+        if not Args[1] then return end
+        local target = Args[1].Character
+        if not plr.Character then return end
+        if not plr.Character:FindFirstChildWhichIsA("Humanoid") then return end
+        if not target then return end
+        if not target:FindFirstChild("HumanoidRootPart") then return end
+        local hum = plr.Character:FindFirstChildWhichIsA("Humanoid")
+        hum:MoveTo(target.HumanoidRootPart.Position)
     end
 })
