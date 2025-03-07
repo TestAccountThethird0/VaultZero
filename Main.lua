@@ -1,19 +1,16 @@
 --T6stKidd's Vault Zero
 
--- -0.5 STATUS: RELEASED
+-- 0.4 STATUS: RELEASED
 --//Changes\\--
---Chat Commands now work properly work for legacy chat service
---Chat logging now works properly for the legacy chat service
---fixed Clip not working
---fixed PLAYER Argument type not working if Text is only numbers
+--Added Command Suggestions
+--Leave & Join logging now shows display & user name instead of username and id
+--Follow Command stops following whenever your/target's model gets removed
+--Now the logs dont show the current date (year, month, day)
 --//New\\--
---Spectate command (view)
---Unspectate command (unview)
---Glow command (light)
---Unglow Command (unlight)
---Follow Command
---Unfollow Command
---Walkto Command
+--AddVelocity Command
+--SetVelocity Command
+--Fly Command
+--Unfly Command
 
 
 if VaultZeroLoaded and VaultZeroLoaded == true then
@@ -23,7 +20,7 @@ end
 pcall(function() getgenv().VaultZeroLoaded = true end)
 local VaultZero = Instance.new("ScreenGui")
 VaultZero.Name = "VaultZero"
---//Type\\
+--//Type\\--
 local Type = Instance.new("Frame")
 local Type_TextBox = Instance.new("TextBox")
 local Type_Suggestions = Instance.new("TextLabel")
@@ -69,11 +66,12 @@ Type_TextBox.Parent = Type
 Type_Suggestions.Name = "Suggestions"
 Type_Suggestions.Text = ""
 Type_Suggestions.Font = Enum.Font.RobotoMono
-Type_Suggestions.TextColor3 = Color3.new(1,1,1)
+Type_Suggestions.TextColor3 = Color3.new(0.85,0.85,0.85)
 Type_Suggestions.BackgroundTransparency = 1
 Type_Suggestions.TextStrokeTransparency = 1
 Type_Suggestions.TextScaled = true
 Type_Suggestions.TextWrapped = true
+Type_Suggestions.TextXAlignment = Enum.TextXAlignment.Left
 Type_Suggestions.Position = UDim2.new(0, 0,0.233, 0)
 Type_Suggestions.Size = UDim2.new(1, 0,0.513, 0)
 Type_Suggestions.ZIndex = 2
@@ -252,13 +250,21 @@ local TextLines = 0
 local LastMsg = nil
 local CommandsRuntime = {}
 
-function CurrentTime()
+function CurrentTime(full)
+    if full == nil then full = false end
     local now = os.time()
     local date = os.date("*t", now)
-    local dateString = string.format("%04d-%02d-%02d %02d:%02d:%02d", 
-                                     date.year, date.month, date.day, 
-                                     date.hour, date.min, date.sec)
-    return dateString
+    
+    if full then
+        local dateString = string.format("%04d-%02d-%02d %02d:%02d:%02d", 
+                                         date.year, date.month, date.day, 
+                                         date.hour, date.min, date.sec)
+        return dateString
+    else
+        local timeString = string.format("%02d:%02d:%02d", 
+                                         date.hour, date.min, date.sec)
+        return timeString
+    end
 end
 
 function ShowLine(Text,NoTime)
@@ -295,6 +301,40 @@ function ShowLine(Text,NoTime)
     if ScrollDown == true then
         Console_ScrollingFrame.CanvasPosition = Vector2.new(0,Console_ScrollingFrame.AbsoluteCanvasSize.Y)
     end
+end
+
+function Suggest(Text)
+    if #Text == 0 then Type_Suggestions.Text = "" return end
+    local chosencommand = nil
+    local commandnAme = nil
+    local word = Text:split(" ")[1]
+    for index,command in CMDDictionary do
+        local CMDName = command.Name:lower()
+        local Alternatives = command.Alternatives
+        if word:lower() == CMDName:sub(1,#word) then
+            chosencommand = command
+            commandnAme = chosencommand.Name
+        else
+            for _,Alternate in Alternatives do
+                Alternate = Alternate:lower()
+                if word:lower() == Alternate:sub(1,#word) then
+                    chosencommand = command
+                    commandnAme = Alternate
+                end
+            end
+        end
+    end
+    if not chosencommand then Type_Suggestions.Text = "" return end
+    local SuggestionText = commandnAme
+    for _,arg in chosencommand.Args do
+        local temp = SuggestionText.." <"..arg..">"
+        if #Text >= (#SuggestionText)+2 then
+        else
+            SuggestionText = temp
+        end
+    end
+    
+    Type_Suggestions.Text = SuggestionText
 end
 
 function GetCommand(Text)
@@ -461,13 +501,13 @@ elseif ChatService.ChatVersion == Enum.ChatVersion.LegacyChatService then
             print("what")
         end
         if CommandsRuntime.log.join == true then
-            ShowLine("[PLR] Player @"..Pplr.Name.." ("..Pplr.UserId..") Joined")
+            ShowLine("[PLR] Player "..Pplr.DisplayName.." (@"..Pplr.Name..") Joined")
         end
         legacyChatPlr(Pplr)
     end)
     Players.PlayerRemoving:Connect(function(Pplr)
         if CommandsRuntime.log.join == true then
-            ShowLine("[PLR] Player @"..Pplr.Name.." ("..Pplr.UserId..") Left")
+            ShowLine("[PLR] Player "..Pplr.DisplayName.." (@"..Pplr.Name..") Left")
         end
         if LegacyChatServicePlayerChatConnections[Pplr] then
             LegacyChatServicePlayerChatConnections[Pplr]:Disconnect()
@@ -488,6 +528,10 @@ elseif ChatService.ChatVersion == Enum.ChatVersion.LegacyChatService then
         lastMsg = msg
     end)
 end
+
+Type_TextBox.Changed:Connect(function()
+    Suggest(Type_TextBox.Text)
+end)
 
 function unloadVaultZero()
     local connections = getconnections(plr.Chatted)
@@ -655,7 +699,7 @@ addCMD({
     ToggleCommand = nil,
     Name = "dex",
     Alternatives = {"explorer"},
-    Args = {"STRING"},
+    Args = {},
     Id = "dex",
     Function = function(Args)
         loadstring(game:HttpGet("https://raw.githubusercontent.com/infyiff/backup/main/dex.lua"))()
@@ -666,7 +710,7 @@ addCMD({
     ToggleCommand = nil,
     Name = "remotespy",
     Alternatives = {"rspy"},
-    Args = {"STRING"},
+    Args = {},
     Id = "remotespy",
     Function = function(Args)
         loadstring(game:HttpGet("https://raw.githubusercontent.com/infyiff/backup/main/SimpleSpyV3/main.lua"))()
@@ -677,7 +721,7 @@ addCMD({
     ToggleCommand = nil,
     Name = "infiniteyield",
     Alternatives = {"iy","infyield"},
-    Args = {"STRING"},
+    Args = {},
     Id = "infiniteyield",
     Function = function()
         loadstring(game:HttpGet('https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source'))()
@@ -688,7 +732,7 @@ addCMD({
     ToggleCommand = nil,
     Name = "infiniteyieldreborn",
     Alternatives = {"iyr","infyieldreborn","iyreborn"},
-    Args = {"STRING"},
+    Args = {},
     Id = "infiniteyieldreborn",
     Function = function()
         loadstring(game:HttpGet(('https://raw.githubusercontent.com/RyXeleron/infiniteyield-reborn/refs/heads/master/source' or 'https://ryxeleron.github.io/storage/iyrbackup/legacy/master/source')))()
@@ -892,7 +936,7 @@ addCMD({
                 ball.Velocity = ball.Velocity + Vector3.new(0, JUMP_POWER, 0)
             end
         end)
-        CommandsRuntime.Marble = {marble = marbleConnection,jump = JumpRequestConnection}
+    CommandsRuntime.Marble = {marble = marbleConnection,jump = JumpRequestConnection}
         Camera.CameraSubject = torso
 
         humanoid.Died:Connect(function()
@@ -914,10 +958,10 @@ addCMD({
         local humanoid = character:WaitForChild("Humanoid")
         local ball = character.HumanoidRootPart
         local marbleConnectionTable = CommandsRuntime.Marble
-        if not marbleConnection then return end
+        if marbleConnectionTable == nil then return end
         local marbleConnection = CommandsRuntime.Marble.marble
         local jumpConnection = CommandsRuntime.Marble.jump
-        if not marbleConnection then return end
+        if marbleConnection == nil then return end
         if originalSize and originalShape then
             ball.Size = originalSize
             ball.Shape = originalShape
@@ -937,7 +981,7 @@ addCMD({
         if jumpConnection then
             jumpConnection:Disconnect()
         end
-        CommandsRuntime.Marble = nil
+        --CommandsRuntime.Marble = nil
     end
 })
 
@@ -963,7 +1007,7 @@ addCMD({
         "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z", 
         "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z", 
         "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "-", "_"," "}
-        local CTime = CurrentTime()
+        local CTime = CurrentTime(true)
         CTime = string.gsub(CTime,":","-")
         local GameId = game.PlaceId
         local GameName = game:GetService("MarketplaceService"):GetProductInfo(GameId).Name
@@ -1078,10 +1122,10 @@ addCMD({
         local Connection = nil
         Connection = runservice.Heartbeat:Connect(function()
             local target = Args[1].Character
-            if not plr.Character then return end
-            if not plr.Character:FindFirstChildWhichIsA("Humanoid") then return end
-            if not target then return end
-            if not target:FindFirstChild("HumanoidRootPart") then return end
+            if not plr.Character then Connection:Disconnect() return end
+            if not plr.Character:FindFirstChildWhichIsA("Humanoid") then Connection:Disconnect() return end
+            if not target then Connection:Disconnect() return end
+            if not target:FindFirstChild("HumanoidRootPart") then Connection:Disconnect() return end
             local hum = plr.Character:FindFirstChildWhichIsA("Humanoid")
             hum:MoveTo(target.HumanoidRootPart.Position)
         end)
@@ -1118,5 +1162,102 @@ addCMD({
         if not target:FindFirstChild("HumanoidRootPart") then return end
         local hum = plr.Character:FindFirstChildWhichIsA("Humanoid")
         hum:MoveTo(target.HumanoidRootPart.Position)
+    end
+})
+
+addCMD({
+    ToggleCommand = nil,
+    Name = "addvelocity",
+    Alternatives = {"addvel"},
+    Args = {"NUMBER","NUMBER","NUMBER"},
+    Id = "addvelocity",
+    Function = function(args)
+        if not plr.Character then return end
+        if not plr.Character.PrimaryPart then return end
+        if not args then return end
+        if not args[1] then return end
+        if not args[2] then return end
+        if not args[3] then return end
+        plr.Character.PrimaryPart:ApplyImpulse(Vector3.new(args[1],args[2],args[3]))
+    end
+})
+
+addCMD({
+    ToggleCommand = nil,
+    Name = "setvelocity",
+    Alternatives = {"setvel","vel"},
+    Args = {"NUMBER","NUMBER","NUMBER"},
+    Id = "setvelocity",
+    Function = function(args)
+        if not plr.Character then return end
+        if not plr.Character.PrimaryPart then return end
+        if not args then return end
+        if not args[1] then return end
+        if not args[2] then return end
+        if not args[3] then return end
+        plr.Character.PrimaryPart.AssemblyLinearVelocity = Vector3.new(args[1],args[2],args[3])
+    end
+})
+
+addCMD({
+    ToggleCommand = true,
+    Name = "fly",
+    Alternatives = {},
+    Args = {"NUMBER"},
+    Id = "fly",
+    Description = "makes you fly, thanks to Zeuxtronic (l_l6658 on discord) for the code",
+    Function = function(args) -- thanks to Zeuxtronic (l_l6658 on discord)
+                              -- for this fly code
+        local lp = plr
+         ExecuteCommand("unfly")
+         local speed = tonumber(args[1])
+         if speed == nil then speed = 1.5 end
+        
+          CM = require(lp.PlayerScripts:WaitForChild('PlayerModule',5):WaitForChild("ControlModule",5))
+          CommandsRuntime.FlyConnection = runservice.PreRender:Connect(function()
+               local movedir = CM:GetMoveVector()
+            local cam = workspace.CurrentCamera
+            local camcf = cam.CFrame
+               if lp.character and lp.character:FindFirstChildWhichIsA("Humanoid") and lp.character:FindFirstChild("HumanoidRootPart") and movedir and CM then
+                local root = lp.character:FindFirstChild("HumanoidRootPart")
+                lp.character.Humanoid.PlatformStand = true
+                root.Anchored = true
+                if not FlyPart then
+                    FlyPart = Instance.new("Part",nil)
+                     FlyPart.Anchored = true
+                      FlyPart.Position = root.Position
+                    FlyPart.CanCollide = false
+                   end
+                 
+                   local pos = FlyPart.Position
+                  pos = pos +(camcf.RightVector *(movedir.X *speed))
+                pos = pos +(camcf.LookVector *(movedir.Z *speed) *-1)
+            
+            
+                FlyPart.CFrame = camcf
+                 FlyPart.Position = pos
+                 root.CFrame = FlyPart.CFrame
+            else
+                ExecuteCommand("unfly")
+            end
+        end)
+    end
+})
+
+addCMD({
+    ToggleCommand = false,
+    Name = "unfly",
+    Alternatives = {},
+    Args = {},
+    Id = "fly",
+    Function = function()
+        if not plr.Character then return end
+        if not plr.Character:FindFirstChild("HumanoidRootPart") then return end
+        if not plr.Character:FindFirstChildWhichIsA("Humanoid") then return end
+        if CommandsRuntime.FlyConnection then
+            CommandsRuntime.FlyConnection:Disconnect()
+            plr.Character.HumanoidRootPart.Anchored = false
+            plr.Character:FindFirstChildWhichIsA("Humanoid").PlatformStand = false
+        end
     end
 })
