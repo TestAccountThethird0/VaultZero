@@ -1,6 +1,6 @@
 --T6stKidd's Vault Zero
 
--- 0.95 STATUS: RELEASED
+-- 0.5 STATUS: RELEASED
 --//Changes\\--
 --Chat Commands now work properly work for legacy chat service
 --Chat logging now works properly for the legacy chat service
