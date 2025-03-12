@@ -1311,7 +1311,7 @@ addCMD({
         end
     end
 })
-
+CommandsRuntime.Loop = {}
 addCMD({
     ToggleCommand = true,
     Name = "loop",
@@ -1322,7 +1322,7 @@ addCMD({
         local connection = runservice.Heartbeat:Connect(function()
             ExecuteCommand(Args[1])
         end)
-        CommandsRuntime.Loop[Args[1]:sub(" ")[1]] = connection
+        CommandsRuntime.Loop[Args[1]:split(" ")[1]] = connection
     end
 })
 
