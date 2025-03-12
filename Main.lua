@@ -1,16 +1,28 @@
 --T6stKidd's Vault Zero
 
--- 0.4 STATUS: RELEASED
---//Changes\\--
---Added Command Suggestions
---Leave & Join logging now shows display & user name instead of username and id
---Follow Command stops following whenever your/target's model gets removed
---Now the logs dont show the current date (year, month, day)
+-- 0.3 STATUS: RELEASED
+--//Changes|Fixes\\--
+--Text now doesnt clear on focus in the ui
+--Clip now works both for r15 and r6
 --//New\\--
---AddVelocity Command
---SetVelocity Command
---Fly Command
---Unfly Command
+--New "..." Argument type
+--Loop Command
+--Unloop Command
+--ClientBring Command
+--Freeze Command
+--Unfreeze Command
+--NoPlayerCollisions Command
+--PlayerCollisions Command
+--Esp Command
+--Unesp Command
+--Keep Vault Zero Command
+--Unkeep Vault Zero Command
+--//INDEV\\--
+--SetWaypoint
+--Waypoint (goto waypoint)
+--Fling [PLAYER]
+--Walkfling
+--Orbit [PLAYER] [DISTANCE] [SPEED]
 
 
 if VaultZeroLoaded and VaultZeroLoaded == true then
@@ -62,6 +74,7 @@ Type_TextBox.TextXAlignment = Enum.TextXAlignment.Left
 Type_TextBox.TextWrapped = true
 Type_TextBox.ZIndex = 2
 Type_TextBox.Parent = Type
+Type_TextBox.ClearTextOnFocus = false
 --
 Type_Suggestions.Name = "Suggestions"
 Type_Suggestions.Text = ""
@@ -224,12 +237,16 @@ CommandArgTypes = {
         else
             return nil
         end
+    end,
+    ["..."] = function()
+        
     end
 }
 
 ---==//Settings\\==---
 MenuKeybind = Enum.KeyCode.Semicolon
 CommandPrefix = {";",":","~","!"}
+local KeepVaultZero = false -- does vault zero persist after being teleported to a different experience
 ---==//Globals\\==---
 local TeleportService = game:GetService("TeleportService")
 local ChatService = game:GetService("TextChatService")
@@ -238,6 +255,7 @@ local uis = game:GetService("UserInputService")
 local runservice = game:GetService("RunService")
 local ContextActionService = game:GetService("ContextActionService")
 Players = game:GetService("Players")
+queueteleport = (syn and syn.queue_on_teleport) or queue_on_teleport or (fluxus and fluxus.queue_on_teleport)
 local TeleportService = game:GetService("TeleportService")
 PlaceId, JobId = game.PlaceId, game.JobId
 local plr = Players.LocalPlayer
@@ -311,7 +329,15 @@ function Suggest(Text)
     for index,command in CMDDictionary do
         local CMDName = command.Name:lower()
         local Alternatives = command.Alternatives
-        if word:lower() == CMDName:sub(1,#word) then
+        local isAlternateName = false
+        for _,Alternate in Alternatives do
+            if word:lower() == Alternate then
+                chosencommand = command
+                commandnAme = Alternate
+                isAlternateName = true
+            end
+        end
+        if word:lower() == CMDName:sub(1,#word) and isAlternateName == false then
             chosencommand = command
             commandnAme = chosencommand.Name
         else
@@ -345,6 +371,12 @@ function GetCommand(Text)
             return Command
         end
     end
+end
+
+function RigType(char)
+    if not char:FindFirstChildWhichIsA("Humanoid") then return end
+    local hum = char:FindFirstChildWhichIsA("Humanoid")
+    return hum.RigType
 end
 
 function ExecuteCommand(Text)
@@ -410,6 +442,13 @@ function ExecuteCommand(Text)
             warn("YOU SERVE ZERO PURPOSE")
         end
         NewValue = Type(Text)
+        if value == "..." then
+            local all_args = ""
+            for i=2,#Args do
+                all_args = all_args..Args[i].." "
+            end
+            table.insert(ValidatedArgs,all_args)
+        end
         table.insert(ValidatedArgs,NewValue)
     end
     Command.Function(ValidatedArgs)
@@ -533,6 +572,13 @@ Type_TextBox.Changed:Connect(function()
     Suggest(Type_TextBox.Text)
 end)
 
+plr.OnTeleport:Connect(function()
+    if KeepVaultZero == true then
+        queueteleport('loadstring(game:HttpGet("https://raw.githubusercontent.com/TestAccountThethird0/VaultZero/refs/heads/main/Main.lua"))()')
+        queueteleport('KeepVaultZero = true')
+    end
+end)
+
 function unloadVaultZero()
     local connections = getconnections(plr.Chatted)
     ContextActionService:UnbindAction("VaultZeroFocus")
@@ -636,7 +682,7 @@ addCMD({
     ToggleCommand = nil,
     Name = "print",
     Alternatives = {},
-    Args = {"STRING"},
+    Args = {"..."},
     Id = "print",
     Function = function(Args)
         print(Args[1])
@@ -747,7 +793,6 @@ addCMD({
     Id = "noclip",
     Function = function()
         local connection = runservice.PreSimulation:Connect(function()
-            print("noclip")
             if plr.Character then
                 for _, child in plr.Character:GetDescendants() do
 			        if child:IsA("BasePart") and child.CanCollide == true then
@@ -772,9 +817,14 @@ addCMD({
             CommandsRuntime.invisible = nil
             if not plr.Character then return end
             if not plr.Character:FindFirstChild("Head") then return end
-            if not plr.Character:FindFirstChild("Torso") then return end
-            plr.Character.Head.CanCollide = true
-            plr.Character.Torso.CanCollide = true
+            plr.Character.HumanoidRootPart.CanCollide = true
+            if RigType(plr.Character) == Enum.HumanoidRigType.R6 then
+                plr.Character.Head.CanCollide = true
+                plr.Character.Torso.CanCollide = true
+            else
+                plr.Character.UpperTorso.CanCollide = true
+                plr.Character.LowerTorso.CanCollide = true
+            end
         end
     end
 })
@@ -1029,7 +1079,7 @@ addCMD({
     ToggleCommand = nil,
     Name = "loadstring",
     Alternatives = {"runcode","execute"},
-    Args = {"STRING"},
+    Args = {"..."},
     Id = "loadstring",
     Function = function(Args)
        loadstring(Args[1]) 
@@ -1259,5 +1309,195 @@ addCMD({
             plr.Character.HumanoidRootPart.Anchored = false
             plr.Character:FindFirstChildWhichIsA("Humanoid").PlatformStand = false
         end
+    end
+})
+
+addCMD({
+    ToggleCommand = true,
+    Name = "loop",
+    Alternatives = {},
+    Args = {"..."},
+    Id = "loop",
+    Function = function(Args)
+        local connection = runservice.Heartbeat:Connect(function()
+            ExecuteCommand(Args[1])
+        end)
+        CommandsRuntime.Loop[Args[1]:sub(" ")[1]] = connection
+    end
+})
+
+addCMD({
+    ToggleCommand = false,
+    Name = "unloop",
+    Alternatives = {},
+    Args = {"STRING"},
+    Id = "loop",
+    Function = function(Args)
+        local con = CommandsRuntime.Loop[Args[1]]
+        if con then
+            con:Disconnect()
+            CommandsRuntime.Loop[Args[1]] = nil
+        end
+    end
+})
+
+addCMD({
+    ToggleCommand = true,
+    Name = "freeze",
+    Alternatives = {"fr"},
+    Args = {"PLAYER"},
+    Id = "freeze",
+    Function = function(Args)
+        if not Args[1] then Args[1] = plr end
+        local target = Args[1]
+        if not target.Character then return end
+        local targetChar = target.Character
+        if not targetChar:FindFirstChild("HumanoidRootPart") then return end
+        local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
+        targetRoot.Anchored = true
+    end
+})
+
+addCMD({
+    ToggleCommand = false,
+    Name = "unfreeze",
+    Alternatives = {"unfr","thaw"},
+    Args = {"PLAYER"},
+    Id = "freeze",
+    Function = function(Args)
+        if not Args[1] then Args[1] = plr end
+        local target = Args[1]
+        if not target.Character then return end
+        local targetChar = target.Character
+        if not targetChar:FindFirstChild("HumanoidRootPart") then return end
+        local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
+        targetRoot.Anchored = false
+    end
+})
+
+addCMD({
+    ToggleCommand = nil,
+    Name = "clientbring",
+    Alternatives = {"cbring"},
+    Args = {"PLAYER"},
+    Id = "clientbring",
+    Function = function(Args)
+        if not Args[1] then return end
+        local target = Args[1]
+        if not target.Character then return end
+        local targetChar = target.Character
+        if not targetChar:FindFirstChild("HumanoidRootPart") then return end
+        local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
+        targetChar:PivotTo(plr.Character.HumanoidRootPart.CFrame)
+    end
+})
+
+addCMD({
+    ToggleCommand = true,
+    Name = "noplayercollisions",
+    Alternatives = {"antifling","nopush"},
+    Args = {},
+    Id = "noplayercollisions",
+    Function = function()
+        ExecuteCommand("playercollisions")
+        for _,player in Players:GetPlayers() do
+            local character = player.Character
+            if not character then return end
+            for _,obj in pairs(character:GetDescendants()) do
+                if obj:IsA("BasePart") then
+                    obj:SetAttribute("noplayercollisions",obj.CanCollide)
+                    obj.CanCollide = false
+                end
+            end
+        end
+    end
+})
+
+addCMD({
+    ToggleCommand = false,
+    Name = "playercollisions",
+    Alternatives = {"unantifling"},
+    Args = {},
+    Id = "noplayercollisions",
+    Function = function()
+        for _,player in Players:GetPlayers() do
+            local character = player.Character
+            if not character then return end
+            for _,obj in character:GetDescendants() do
+                if obj:IsA("BasePart") and obj:GetAttribute("noplayercollisions") then
+                    obj.CanCollide = obj:GetAttribute("noplayercollisions")
+                    obj:SetAttribute("noplayercollisions",nil)
+                end
+            end
+        end
+    end
+})
+
+addCMD({
+    ToggleCommand = true,
+    Name = "esp",
+    Alternatives = {},
+    Args = {},
+    Id = "esp",
+    Function = function()
+        local connection = runservice.PreRender:Connect(function()
+            for _,player in Players:GetPlayers() do
+                if not player.Character then return end
+                local character = player.Character
+                if not character:FindFirstChild("VAULTESP") then
+                    local highlight = Instance.new("Highlight")
+                    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+                    highlight.FillColor = Color3.new(1,1,1)
+                    highlight.FillTransparency = 0.6
+                    highlight.OutlineTransparency = 1
+                    highlight.Adornee = character
+                    highlight.Name = "VAULTESP"
+                    highlight.Parent = character
+                end
+            end
+        end)
+        CommandsRuntime.ESP = connection
+    end
+})
+
+addCMD({
+    ToggleCommand = false,
+    Name = "unesp",
+    Alternatives = {},
+    Args = {},
+    Id = "esp",
+    Function = function()
+        if CommandsRuntime.ESP then
+            CommandsRuntime.ESP:Disconnect()
+            CommandsRuntime.ESP = nil
+            for _,player in Players:GetPlayers() do
+                if not player.Character then return end
+                if player.Character:FindFirstChild("VAULTESP") then
+                    player.Character.VAULTESP:Destroy()
+                end
+            end
+        end
+    end
+})
+
+addCMD({
+    ToggleCommand = true,
+    Name = "keepvaultzero",
+    Alternatives = {"keepv0","keepvz"},
+    Args = {},
+    Id = "keepvaultzero",
+    Function = function()
+        KeepVaultZero = true
+    end
+})
+
+addCMD({
+    ToggleCommand = false,
+    Name = "losevaultzero",
+    Alternatives = {"unkeepv0","unkeepvz","unkeepvaultzero"},
+    Args = {},
+    Id = "keepvaultzero",
+    Function = function()
+        KeepVaultZero = false
     end
 })
