@@ -725,7 +725,6 @@ addCMD({
         end
     end
 })
-CommandsRuntime.Loop = {}
 addCMD({
     ToggleCommand = true,
     Name = "loop",
