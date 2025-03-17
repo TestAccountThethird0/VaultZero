@@ -1,32 +1,23 @@
 --T6stKidd's Vault Zero
 
--- 0.3 STATUS: RELEASED
+-- 0.2 STATUS: RELEASED
 --//Changes|Fixes\\--
---Text now doesnt clear on focus in the ui
---Clip now works both for r15 and r6
+--Fly command now works better
 --//New\\--
---New "..." Argument type
---Loop Command
---Unloop Command
---ClientBring Command
---Freeze Command
---Unfreeze Command
---NoPlayerCollisions Command
---PlayerCollisions Command
---Esp Command
---Unesp Command
---Keep Vault Zero Command
---Unkeep Vault Zero Command
---//INDEV\\--
---SetWaypoint
---Waypoint (goto waypoint)
---Fling [PLAYER]
---Walkfling
---Orbit [PLAYER] [DISTANCE] [SPEED]
+--SetWaypoint Command
+--GotoWaypoint Command
+--DeleteWaypoint Command
+--Orbit Command
+--Unorbit Command
+--Fling Command
+--Spin Command
+--Unspin Command
+--AntiVoid Command
+--UnAntiVoid Command
 
-
+local plr = game.Players.LocalPlayer
 if VaultZeroLoaded and VaultZeroLoaded == true then
-    warn("Vault Zero is already running.")
+    print("Vault Zero is already running")
     return
 end
 pcall(function() getgenv().VaultZeroLoaded = true end)
@@ -258,7 +249,6 @@ Players = game:GetService("Players")
 queueteleport = (syn and syn.queue_on_teleport) or queue_on_teleport or (fluxus and fluxus.queue_on_teleport)
 local TeleportService = game:GetService("TeleportService")
 PlaceId, JobId = game.PlaceId, game.JobId
-local plr = Players.LocalPlayer
 local CMDIDs = {}
 local CMDDictionary = {}
 local CommandsVariables = {}
@@ -306,13 +296,13 @@ function ShowLine(Text,NoTime)
     Line.Text = Text
     Line.Parent = Console_ScrollingFrame
     Line.Visible = true
-    TextLines += 1
+    TextLines = TextLines + 1
     LastMsg = Line
     VaultZeroLogs = VaultZeroLogs.."\n "..Text
     local Total = 0
     for _,obj in Console_ScrollingFrame:GetChildren() do
         if obj:IsA("TextLabel") then
-            Total += 16
+            Total = Total + 16
         end
     end
     Console_ScrollingFrame.CanvasSize = UDim2.new(0,0,0,Total)
@@ -426,7 +416,6 @@ function ExecuteCommand(Text)
         end
     end
     if not Args or Args[1] == nil then
-        warn("YOU INSIGNIFICANT FUCK")
         return
     end
     local CommandName = Args[1]:lower()
@@ -438,9 +427,6 @@ function ExecuteCommand(Text)
     for index,value in CommandArgs do
         local Type = CommandArgTypes[value]
         local Text = Args[index+1]
-        if Type == nil then
-            warn("YOU SERVE ZERO PURPOSE")
-        end
         NewValue = Type(Text)
         if value == "..." then
             local all_args = ""
@@ -584,6 +570,13 @@ function unloadVaultZero()
     ContextActionService:UnbindAction("VaultZeroFocus")
     pcall(function() getgenv().VaultZeroLoaded = false end)
     game.CoreGui.VaultZero:Destroy()
+end
+
+plr.CharacterAdded:Connect(function(char)
+    char.PrimaryPart = char:WaitForChild("HumanoidRootPart")
+end)
+if plr.Character then
+    plr.Character.PrimaryPart = plr.Character:FindFirstChild("HumanoidRootPart")
 end
 
 addCMD({
@@ -965,16 +958,16 @@ addCMD({
                 return
             end
             if uis:IsKeyDown("W") then
-                ball.RotVelocity -= Camera.CFrame.RightVector * delta * SPEED_MULTIPLIER
+                ball.RotVelocity = ball.RotVelocity - Camera.CFrame.RightVector * delta * SPEED_MULTIPLIER
             end
             if uis:IsKeyDown("A") then
-                ball.RotVelocity -= Camera.CFrame.LookVector * delta * SPEED_MULTIPLIER
+                ball.RotVelocity = ball.RotVelocity - Camera.CFrame.LookVector * delta * SPEED_MULTIPLIER
             end
             if uis:IsKeyDown("S") then
-                ball.RotVelocity += Camera.CFrame.RightVector * delta * SPEED_MULTIPLIER
+                ball.RotVelocity = ball.RotVelocity + Camera.CFrame.RightVector * delta * SPEED_MULTIPLIER
             end
             if uis:IsKeyDown("D") then
-                ball.RotVelocity += Camera.CFrame.LookVector * delta * SPEED_MULTIPLIER
+                ball.RotVelocity = ball.RotVelocity + Camera.CFrame.LookVector * delta * SPEED_MULTIPLIER
             end
         end)
 
@@ -1264,7 +1257,7 @@ addCMD({
          if speed == nil then speed = 1.5 end
         
           CM = require(lp.PlayerScripts:WaitForChild('PlayerModule',5):WaitForChild("ControlModule",5))
-          CommandsRuntime.FlyConnection = runservice.PreRender:Connect(function()
+          CommandsRuntime.FlyConnection = runservice.Heartbeat:Connect(function()
                local movedir = CM:GetMoveVector()
             local cam = workspace.CurrentCamera
             local camcf = cam.CFrame
@@ -1499,5 +1492,213 @@ addCMD({
     Id = "keepvaultzero",
     Function = function()
         KeepVaultZero = false
+    end
+})
+CommandsRuntime.waypoints = {}
+addCMD({
+    ToggleCommand = nil,
+    Name = "setwaypoint",
+    Alternatives = {"createwaypoint","swp"},
+    Args = {"STRING"},
+    Id = "setwaypoint",
+    Function = function(Args)
+        if not Args[1] then return end
+        if not plr.Character then return end
+        if not plr.Character:FindFirstChild("HumanoidRootPart") then return end
+        local root = plr.Character:FindFirstChild("HumanoidRootPart")
+        local printPos = Vector3.new(
+            math.round(root.Position.X),
+            math.round(root.Position.Y),
+            math.round(root.Position.Z)
+            )
+        CommandsRuntime.waypoints[Args[1]] = root.Position
+        ShowLine("[WAYPOINTS] Created Waypoint '"..Args[1].."' at "..string.gsub(tostring(printPos),",",""))
+    end
+})
+
+addCMD({
+    ToggleCommand = nil,
+    Name = "gotowaypoint",
+    Alternatives = {"waypoint","gwaypoint","gwp","wp"},
+    Args = {"STRING"},
+    Id = "gotowaypoint",
+    Function = function(Args)
+        if not Args[1] then return end
+        if not plr.Character then return end
+        if not plr.Character:FindFirstChild("HumanoidRootPart") then return end
+        if not CommandsRuntime.waypoints[Args[1]] then return end
+        local pos = CommandsRuntime.waypoints[Args[1]]
+        plr.Character:PivotTo(CFrame.new(pos))
+    end
+})
+
+addCMD({
+    ToggleCommand = nil,
+    Name = "deletewaypoint",
+    Alternatives = {"removewaypoint","destroywaypoint","dwp","rwp"},
+    Args = {"STRING"},
+    Id = "deletewaypoint",
+    Function = function(Args)
+        if not Args[1] then return end
+        if not plr.Character then return end
+        if not plr.Character:FindFirstChild("HumanoidRootPart") then return end
+        if not CommandsRuntime.waypoints[Args[1]] then return end
+        CommandsRuntime.waypoints[Args[1]] = nil
+        ShowLine("[WAYPOINTS] Deleted Waypoint '"..Args[1].."'")
+    end
+})
+
+addCMD({
+    ToggleCommand = true,
+    Name = "orbit",
+    Alternatives = {},
+    Args = {"PLAYER","NUMBER","NUMBER"}, -- PLAYER DISTANCE SPEED
+    Id = "orbit",
+    Function = function(Args)
+        local FRame = 0
+        if not Args[1] then return end
+        if not Args[2] then return end
+        if not Args[3] then return end
+        local conn
+        conn = runservice.Heartbeat:Connect(function()
+            if not Args[1].Character then return end
+            local Targetchar = Args[1].Character
+            if not Targetchar:FindFirstChild("HumanoidRootPart") then return end
+            local TargetRoot = Targetchar.HumanoidRootPart
+            if not plr.Character then return end
+            local char = plr.Character
+            FRame = FRame + Args[3]
+            CF = CFrame.new(TargetRoot.Position)*CFrame.Angles(
+                0,math.rad(FRame),0)
+            CF = CF+CF.LookVector*Args[2]
+            CF = CFrame.lookAt(CF.Position,TargetRoot.Position)
+            char:PivotTo(CF)
+            if FRame >= 360 then
+                FRame = FRame-360
+            end
+        end)
+        CommandsRuntime.orbit = conn
+    end
+})
+
+addCMD({
+    ToggleCommand = false,
+    Name = "unorbit",
+    Alternatives = {},
+    Args = {},
+    Id = "unorbit",
+    Function = function()
+        if not CommandsRuntime.orbit then return end
+        CommandsRuntime.orbit:Disconnect()
+        CommandsRuntime.orbit = nil
+    end
+})
+
+addCMD({
+    ToggleCommand = true,
+    Name = "fling",
+    Alternatives = {},
+    Args = {"PLAYER"},
+    Id = "fling",
+    Function = function(Args)
+        if not Args[1] then return end
+        if not Args[1].Character then return end
+        local TChar = Args[1].Character
+        if not TChar:FindFirstChild("HumanoidRootPart") then return end
+        if not plr.Character then return end
+        if not plr.Character.PrimaryPart then return end
+        local cf = plr.Character.PrimaryPart.CFrame
+        local fallen = workspace.FallenPartsDestroyHeight
+        workspace.FallenPartsDestroyHeight = 0/0
+        local Thrust = Instance.new('BodyThrust', plr.Character.PrimaryPart)
+		Thrust.Force = Vector3.new(999999,-999999,999999)
+		Thrust.Name = "VAULTZEROFLING"
+		Thrust.Parent = plr.Character.PrimaryPart
+		spawn(function()
+		    repeat
+		        local Pos = TChar.HumanoidRootPart.Position+((TChar.Humanoid.MoveDirection*TChar.Humanoid.WalkSpeed)/60)
+		        if TChar.Humanoid.MoveDirection == Vector3.new(0,0,0) then
+                    Pos = TChar.HumanoidRootPart.Position
+                end
+		        plr.Character:PivotTo(CFrame.new(Pos))
+		        Thrust.Location = Pos
+		        runservice.Heartbeat:wait()
+		until not Args[1].Character or TChar.PrimaryPart.AssemblyLinearVelocity.Magnitude >= 5000
+        Thrust:Destroy()
+        local prim = plr.Character.PrimaryPart
+        if prim == nil then return end
+        plr.Character.PrimaryPart.AssemblyLinearVelocity = Vector3.zero
+        plr.Character.PrimaryPart.AssemblyAngularVelocity = Vector3.zero
+        task.wait(0.3)
+        workspace.FallenPartsDestroyHeight = fallen
+        plr.Character:PivotTo(cf)
+	    end)
+    end
+})
+
+addCMD({
+    ToggleCommand = true,
+    Name = "spin",
+    Alternatives = {},
+    Args = {"NUMBER"},
+    Id = "spin",
+    Function = function(Args)
+        if not Args[1] then return end
+        if not plr.Character then return end
+        local char = plr.Character
+        if not char:FindFirstChild("HumanoidRootPart") then return end
+        local root = char:FindFirstChild("HumanoidRootPart")
+        if root:FindFirstChild("VAULTZEROSPIN") then
+            root:FindFirstChild("VAULTZEROSPIN").AngularVelocity = Vector3.new(0,Args[1],0)
+            return 
+        end
+        local spin = Instance.new("BodyAngularVelocity")
+        spin.MaxTorque = Vector3.new(math.huge,math.huge,math.huge)
+        spin.P = math.huge
+        spin.AngularVelocity = Vector3.new(0,Args[1],0)
+        spin.Name = "VAULTZEROSPIN"
+        spin.Parent = root
+    end
+})
+
+addCMD({
+    ToggleCommand = false,
+    Name = "unspin",
+    Alternatives = {},
+    Args = {},
+    Id = "spin",
+    Function = function()
+        if not plr.Character then return end
+        local char = plr.Character
+        if not char:FindFirstChild("HumanoidRootPart") then return end
+        local root = char:FindFirstChild("HumanoidRootPart")
+        if not root:FindFirstChild("VAULTZEROSPIN") then return end
+        root:FindFirstChild("VAULTZEROSPIN"):Destroy()
+    end
+})
+
+addCMD({
+    ToggleCommand = true,
+    Name = "antivoid",
+    Alternatives = {"novoid","unvoid"},
+    Args = {},
+    Id = "antivoid",
+    Function = function()
+        if CommandsRuntime.Fallen ~= nil then return end
+        CommandsRuntime.Fallen = workspace.FallenPartsDestroyHeight
+        workspace.FallenPartsDestroyHeight = 0/0
+    end
+})
+
+addCMD({
+    ToggleCommand = false,
+    Name = "unantivoid",
+    Alternatives = {"yesvoid","void"},
+    Args = {},
+    Id = "unantivoid",
+    Function = function()
+        if CommandsRuntime.Fallen == nil then return end
+        workspace.FallenPartsDestroyHeight = CommandsRuntime.Fallen
+        CommandsRuntime.Fallen = nil
     end
 })
